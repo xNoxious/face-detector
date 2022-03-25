@@ -24,7 +24,7 @@ class SignIn extends React.Component {
             password: this.state.signInPassword
         }
 
-        fetch(process.env.BACKEND_URL + '/signin', {
+        fetch('https://lit-dusk-83072.herokuapp.com/signin', {
             method: 'post',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
