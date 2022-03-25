@@ -30,7 +30,7 @@ class Register extends React.Component {
             password: this.state.password
         }
         
-        fetch(process.env.BACKEND_URL + '/register', {
+        fetch('https://lit-dusk-83072.herokuapp.com/register', {
             method: 'post',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
