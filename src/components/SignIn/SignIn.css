@@ -1,0 +1,3 @@
+.hover-black:hover{
+    background-color: #000 !important; /* this overrides a Bootstrap !important that ruins our login page */
+}

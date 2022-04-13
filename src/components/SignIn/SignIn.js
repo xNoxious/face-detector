@@ -1,4 +1,5 @@
 import React from "react";
+import './SignIn.css'
 
 class SignIn extends React.Component {
     constructor(props) {
@@ -18,6 +19,10 @@ class SignIn extends React.Component {
         this.setState({ signInPassword: event.target.value })
     }
 
+    saveAuthTokenInSession = (token) => {
+        window.sessionStorage.setItem('token', token);
+    }
+
     onSubmitSignIn = () => {
         let params = {
             email: this.state.signInEmail,
@@ -30,14 +35,27 @@ class SignIn extends React.Component {
             body: JSON.stringify(params)
         })
             .then(response => response.json())
-            .then(user => {
-                if (user.id) {
-                    this.props.loadUser(user);
-                    this.props.onRouteChange('home');
+            .then(data => {
+                if (data.userId && data.success === 'true') {
+                    this.saveAuthTokenInSession(data.token);
+                    fetch(`https://lit-dusk-83072.herokuapp.com/profile/${data.userId}`, {
+                        method: 'get',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': data.token
+                        }
+                    })
+                        .then(resp => resp.json())
+                        .then(user => {
+                            if (user && user.email) {
+                                this.props.loadUser(user);
+                                this.props.onRouteChange('home');
+                            }
+                        })
                 } else {
-                    alert(user) // backend will return error message
+                    alert('Cannot login due to mismatching credentials') // backend will return error message
                 }
-            })
+            });
     }
 
     render() {
@@ -53,7 +71,7 @@ class SignIn extends React.Component {
                                 <label className="db fw6 lh-copy f6" htmlFor="email-address">Email</label>
                                 <input
                                     onChange={this.onEmailChange}
-                                    className="pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100"
+                                    className="pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100 hover-black"
                                     type="email"
                                     name="email-address"
                                     id="email-address" />
@@ -62,7 +80,7 @@ class SignIn extends React.Component {
                                 <label className="db fw6 lh-copy f6" htmlFor="password">Password</label>
                                 <input
                                     onChange={this.onPasswordChange}
-                                    className="b pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100"
+                                    className="b pa2 input-reset ba bg-transparent hover-bg-black hover-white w-100 hover-black"
                                     type="password"
                                     name="password"
                                     id="password" />
