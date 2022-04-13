@@ -7,6 +7,8 @@ import ImageLinkForm from './components/ImageLinkForm/ImageLinkForm';
 import Rank from './components/Rank/Rank';
 import FaceRecognition from './components/FaceRecognition/FaceRecognition';
 import Particles from "react-tsparticles";
+import Modal from './components/Modal/Modal';
+import Profile from './components/Profile/Profile';
 
 const particlesOptions = {
   fpsLimit: 120,
@@ -84,15 +86,18 @@ const particlesOptions = {
 const INITIAL_STATE = {
   input: '',
   imageUrl: '',
-  boxes: {},
+  boxes: [],
   route: 'signin', // Yes, yes, I can use React Router but this app will have 4 routes and it's premature optimization at this point.
   isSignedIn: false,
+  isProfileOpen: false,
   user: {
     id: '',
     name: '',
     email: '',
     entries: 0,
-    joined: ''
+    joined: '',
+    pet: '',
+    age: ''
   }
 }
 
@@ -102,6 +107,40 @@ class App extends Component {
     this.state = INITIAL_STATE;
   }
 
+  // Before anything happens, we check if user ha token
+  componentDidMount() {
+    const token = window.sessionStorage.getItem('token');
+    if (token) {
+      fetch('https://lit-dusk-83072.herokuapp.com/signin', {
+        method: 'post',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token
+        }
+      })
+        .then(resp => resp.json())
+        .then(data => {
+          if (data && data.id) {
+            fetch(`https://lit-dusk-83072.herokuapp.com/profile/${data.id}`, {
+              method: 'get',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token
+              }
+            })
+              .then(resp => resp.json())
+              .then(user => {
+                if (user && user.email) {
+                  this.loadUser(user);
+                  this.onRouteChange('home');
+                }
+              });
+          }
+        })
+        .catch(() => console.log('You got some issues, Stan'));
+    }
+  }
+
   loadUser = (data) => {
     this.setState({
       user: {
@@ -109,36 +148,44 @@ class App extends Component {
         name: data.name,
         email: data.email,
         entries: data.entries,
-        joined: data.joined
+        joined: data.joined,
+        age: data.age,
+        pet: data.pet
       }
     })
   }
 
   calculateFaceLocation = (data) => {
-    const image = document.getElementById('inputImage');
-    const width = Number(image.width);
-    const height = Number(image.height);
 
-    console.log('data,', data)
-    let boxesArray = [];
+    if (data) {
+      const image = document.getElementById('inputImage');
+      const width = Number(image.width);
+      const height = Number(image.height);
 
-    for (let i = 0; i < data.length; i++) {
+      let boxesArray = [];
 
-      let boundingBox = data[i].region_info.bounding_box;
+      for (let i = 0; i < data.length; i++) {
 
-      boxesArray.push({
-        leftCol: boundingBox.left_col * width,
-        topRow: boundingBox.top_row * height,
-        rightCol: width - (boundingBox.right_col * width),
-        bottomRow: height - (boundingBox.bottom_row * height),
-      });
+        let boundingBox = data[i].region_info.bounding_box;
+
+        boxesArray.push({
+          leftCol: boundingBox.left_col * width,
+          topRow: boundingBox.top_row * height,
+          rightCol: width - (boundingBox.right_col * width),
+          bottomRow: height - (boundingBox.bottom_row * height),
+        });
+      }
+
+      return boxesArray;
     }
 
-    return boxesArray;
+    return;
   };
 
   displayFacebox = (boxes) => {
-    this.setState({ boxes: boxes });
+    if (boxes) {
+      this.setState({ boxes: boxes });
+    }
   }
 
   onInputChange = (event) => {
@@ -147,7 +194,8 @@ class App extends Component {
 
   onRouteChange = (route) => {
     if (route === 'signin') {
-      this.setState(INITIAL_STATE)
+      window.sessionStorage.removeItem('token');
+      return this.setState(INITIAL_STATE)
     } else if (route === 'home') {
       this.setState({ isSignedIn: true })
     }
@@ -159,7 +207,10 @@ class App extends Component {
     this.setState({ imageUrl: this.state.input });
     fetch('https://lit-dusk-83072.herokuapp.com/imageUrl', {
       method: 'post',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': window.sessionStorage.getItem('token')
+      },
       body: JSON.stringify({
         input: this.state.input
       })
@@ -169,7 +220,10 @@ class App extends Component {
         if (response) {
           fetch('https://lit-dusk-83072.herokuapp.com/imageCount', {
             method: 'put',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': window.sessionStorage.getItem('token')
+            },
             body: JSON.stringify({
               id: this.state.user.id
             })
@@ -178,23 +232,42 @@ class App extends Component {
             .then(count => {
               this.setState(Object.assign(this.state.user, { entries: count }));
             })
-            .catch(console.log);
+            .catch(() => console.log('You got some issues, Stan'));
 
         }
+
         this.displayFacebox(this.calculateFaceLocation(response))
       })
-      .catch(err => console.log(err));
+      .catch(() => console.log('You got some issues, Stan'));
+  }
+
+  toggleModal = () => {
+    this.setState(prevState => ({
+      ...prevState,
+      isProfileOpen: !prevState.isProfileOpen
+    }));
   }
 
   render() {
-    const { isSignedIn, imageUrl, route, boxes } = this.state;
+    const { isSignedIn, imageUrl, route, boxes, isProfileOpen, user } = this.state;
     return (
       <div className="App" >
         <Particles className='particles'
           id="tsparticles"
           options={particlesOptions}
         />
-        <Navigation isSignedIn={isSignedIn} onRouteChange={this.onRouteChange} />
+        <Navigation isSignedIn={isSignedIn}
+          onRouteChange={this.onRouteChange}
+          toggleModal={this.toggleModal} />
+        {isProfileOpen ?
+          <Modal>
+            <Profile
+              isProfileOpen={isProfileOpen}
+              toggleModal={this.toggleModal}
+              loadUser={this.loadUser}
+              user={user} />
+          </Modal>
+          : null}
         {route === 'home' ?
           <div>
             <Rank name={this.state.user.name} entries={this.state.user.entries} />
